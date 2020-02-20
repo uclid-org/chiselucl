@@ -2,6 +2,10 @@
 
 [Chisel](https://www.github.com/freechipsproject/chisel3) utilities for modeling and a [FIRRTL](https://www.github.com/freechipsproject/firrtl) backend for the [UCLID5](https://www.github.com/uclid-org/uclid) modeling system.
 
+Contributors:
+Albert Magyar
+Pranav Gaddamadugu
+
 ## Example: using the FIRRTL translator
 The following commands need to be run to configure the repository
 ```
