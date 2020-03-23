@@ -29,7 +29,7 @@ package object uclid {
   }
 
   object Assert {
-    def apply(condition: Boolean): Bool = apply(condition, None)
+    def apply(condition: Bool): Bool = apply(condition, None)
     def apply(condition: Bool, name: String): Bool = apply(condition, Some(name))
     def apply(condition: Bool, name: Option[String])(implicit compileOptions: CompileOptions): Bool = {
       name.foreach { condition.suggestName(_) }
