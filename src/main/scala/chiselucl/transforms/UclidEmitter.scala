@@ -66,9 +66,9 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
     case Neg => s"-$arg0"
     case Not => s"~${arg0}" 
     // TODO: Handle asUInt operator
-    case asUInt => arg0
+    case AsUInt => arg0
     // TODO: Handle asSInt operator
-    case asSInt => arg0
+    case AsSInt => arg0
     case _ => throwInternalError(s"Illegal unary operator: ${p.op}")
   }
 

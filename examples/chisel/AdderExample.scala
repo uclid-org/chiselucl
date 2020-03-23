@@ -11,9 +11,12 @@ class Adder extends Module {
     val sum = Output(UInt(4.W))
   })
 
+  val revert = io.sum - io.b
+
   io.sum := io.a + io.b
   Assume(io.a > 1.U, "a_bigger_than_one")
   Assert(io.sum > io.b, "output_bigger")
+  Assert(revert  =/= 0.U, "nonsense")
 }
 
 object AdderModel extends App {

@@ -7,6 +7,8 @@ import firrtl._
 import firrtl.ir._
 import firrtl.Mappers._
 
+//TODO: Check with albert on keeping this transform
+
 object RemoveTail {
   def removeTailE(expr: Expression): Expression = expr.map(removeTailE) match {
     case DoPrim(PrimOps.Tail, Seq(e), Seq(amt), tpe) =>
