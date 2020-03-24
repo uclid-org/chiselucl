@@ -49,14 +49,15 @@ object ExpandMemoryWires {
       modInfo.nodes,
       newWires.toSeq ++ modInfo.wireDecls,
       modInfo.instDecls,
-      modInfo.clocks,
       modInfo.regResets,
       modInfo.regDecls,
       modInfo.memDecls,
       modInfo.regAssigns,
       modInfo.combAssigns,
       modInfo.wireAssigns,
-      modInfo.properties
+      modInfo.properties,
+      modInfo.clocks,
+      None
     )
   }
 

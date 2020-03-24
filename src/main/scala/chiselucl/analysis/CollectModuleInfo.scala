@@ -87,14 +87,15 @@ object CollectModuleInfo {
       nodes.toSeq,
       wireDecls.toSeq,
       instDecls.toSeq,
-      clocks.toSet,
       regResets.toSet,
       regDecls.toSet,
       memDecls.toSet,
       regAssigns.toSeq,
       combAssigns.toSeq,
       wireAssigns.toSeq,
-      properties.toSeq
+      properties.toSeq,
+      clocks.toSet,
+      None
     )
   }
 }

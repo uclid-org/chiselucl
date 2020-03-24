@@ -37,22 +37,57 @@ case class CircuitInfoAnnotation(
 
 }
 
+//TODO: Should we use named 
+trait Name {
+  def name: String
+}
+
+trait StateInfo {
+  def nodes: Seq[DefNode]
+  def wireDecls: Seq[DefWire]
+  def instDecls: Seq[WDefInstance]
+  def regResets: Set[String]
+  def regDecls: Set[DefRegister]
+  def memDecls: Set[DefMemory]
+  def regAssigns: Seq[Connect]
+  def combAssigns: Seq[Connect]
+  def wireAssigns: Seq[Connect]
+}
+
+trait PropertyInfo {
+  def properties: Seq[VerificationFormula]
+}
+  
+trait ClockInfo {
+  def clocks: Set[Expression]
+  def clockSets: Option[Set[Set[Expression]]]
+}
+
+
+
+
 /**
   * Collect information on relevant module state and assertions
   * to be used when constructing a solver query.
   *
   */
 case class ModuleInfoAnnotation(
-  name: String,
-  nodes: Seq[DefNode],
-  wireDecls: Seq[DefWire],
-  instDecls: Seq[WDefInstance],
-  clocks: Set[Expression],
-  regResets: Set[String],
-  regDecls: Set[DefRegister],
-  memDecls: Set[DefMemory],
-  regAssigns: Seq[Connect],
-  combAssigns: Seq[Connect],
-  wireAssigns: Seq[Connect],
-  properties: Seq[VerificationFormula]
-) extends VerificationInfoAnnotation 
+  override val name: String,
+  override val nodes: Seq[DefNode],
+  override val wireDecls: Seq[DefWire],
+  override val instDecls: Seq[WDefInstance],
+  override val regResets: Set[String],
+  override val regDecls: Set[DefRegister],
+  override val memDecls: Set[DefMemory],
+  override val regAssigns: Seq[Connect],
+  override val combAssigns: Seq[Connect],
+  override val wireAssigns: Seq[Connect],
+  override val properties: Seq[VerificationFormula],
+  override val clocks: Set[Expression],
+  override val clockSets: Option[Set[Set[Expression]]]
+) extends VerificationInfoAnnotation with Name 
+                                     with StateInfo 
+                                     with ClockInfo 
+                                     with PropertyInfo
+
+
