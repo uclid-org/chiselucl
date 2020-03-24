@@ -1,4 +1,4 @@
-// See LICESNSE for license details.
+// See LICENSE for license details.
 
 package chiselucl
 package analysis
@@ -103,6 +103,7 @@ object CollectModuleInfo {
 class CollectModuleInfo extends Transform {
   def inputForm = LowForm
   def outputForm = LowForm
+
 
   def execute(state: CircuitState): CircuitState = {
     val moduleInfoAnnos = state.circuit.modules.flatMap { 
