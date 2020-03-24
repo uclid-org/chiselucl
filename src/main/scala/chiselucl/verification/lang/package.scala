@@ -7,6 +7,14 @@ import chisel3.experimental.{requireIsHardware}
 //TODO: Need to add more elements to this language so that we can 
 // guard signals more precisely
 
+//TODO: This needs to be moved to somewhere in the chisel/firrtl repos, since 
+//          we want to expose a common verification front-end. Note that we 
+//          also want people to be able to easily write their own verification
+//          frontends, so we might also want the verification passes to be
+//          aware of the specs they are using
+
+//TODO: Consult Albert on this
+
 package object lang {
 
   sealed trait VerificationFormula
