@@ -8,6 +8,8 @@ import firrtl.ir._
 import firrtl.Utils.kind
 import firrtl.Mappers._
 
+//TODO: Check with Albert on keeping this transform
+
 object SimplifyRegUpdate {
   def onStmt(namespace: Namespace)(stmt: Statement): Statement = stmt.map(onStmt(namespace)) match {
     case Connect(info, lhs, rhs) if kind(lhs) == RegKind =>

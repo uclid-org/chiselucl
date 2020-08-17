@@ -49,6 +49,10 @@ channel_info
 
 .project
 
+# Metals Stuff
+.bloop
+.metals
+
 # sbt specific
 .cache
 .history
@@ -59,13 +63,14 @@ lib_managed/
 src_managed/
 project/boot/
 project/plugins/project/
+project/metals.sbt
 .idea/
 gen/
 project/project/
 /bin/
 
 # include FIRRTL examples
-!src/main/scala/chiselucl/examples/firrtl/*
+!examples/firrtl/*
 
 
 *~

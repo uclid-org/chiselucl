@@ -2,7 +2,7 @@
 organization := "edu.berkeley.cs"
 name := "chiselucl"
 version := "0.2-SNAPSHOT"
-scalaVersion := "2.12.7"
+scalaVersion := "2.12.11"
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full)
 //crossScalaVersions := Nil
 

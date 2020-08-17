@@ -20,6 +20,7 @@ package object uclid {
     def apply(condition: Bool): Bool = apply(condition, None)
     def apply(condition: Bool, name: String): Bool = apply(condition, Some(name))
     def apply(condition: Bool, name: Option[String])(implicit compileOptions: CompileOptions): Bool = {
+      condition.getClass.getMethods.map(m => println(m.getName))
       name.foreach { condition.suggestName(_) }
       GuardSignal(condition)
       annotate(new ChiselAnnotation { def toFirrtl = UclidAssumptionAnnotation(condition.toTarget) })
