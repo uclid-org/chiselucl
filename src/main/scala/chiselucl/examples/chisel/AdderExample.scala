@@ -2,7 +2,7 @@ package chiselucl
 package examples
 
 import chisel3._
-import uclid._
+import chiselucl.properties._
 
 class Adder extends Module {
   val io = IO(new Bundle {
