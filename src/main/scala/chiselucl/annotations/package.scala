@@ -1,5 +1,4 @@
 package chiselucl
-package util
 
 import firrtl.RenameMap
 import firrtl.annotations._

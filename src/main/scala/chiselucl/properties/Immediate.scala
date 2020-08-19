@@ -1,7 +1,7 @@
 package chiselucl
 package properties
 
-import util.annotations._
+import annotations._
 
 import chisel3._
 import chisel3.experimental.{ChiselAnnotation, annotate, requireIsHardware}

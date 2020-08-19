@@ -6,7 +6,7 @@ package backend
 
 import java.io.Writer
 
-import util.annotations._
+import chiselucl.annotations._
 
 import firrtl._
 import firrtl.analyses._
