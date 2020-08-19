@@ -1,4 +1,4 @@
-// See LICENSE for license details.
+// See LICENASE for license details.
 // Using rules from FIRRTL Spec 0.2.0
 
 package chiselucl
@@ -20,13 +20,27 @@ import MemPortUtils.{memPortField}
 
 import scala.collection.mutable.{ArrayBuffer, LinkedHashMap, HashSet}
 
-class IndentLevel {
-  var value: Int = 0
-  def increase() = value += 2
-  def decrease() = value -= 2
+class WriterState(writer: Writer = new java.io.StringWriter, debugOutput: Boolean = false) {
+  def write(s: String): Unit = writer.write(s)
+  def serialize(): String = writer.toString()
+
+  def debugComment(s: String): Unit = {
+    if (debugOutput) {
+      write(" " * indentLevel)
+      write(s"// ${s}\n")
+    }
+  }
+
+  private var indentValue: Int = 0
+  def increaseIndent() = indentValue += 2
+  def decreaseIndent() = indentValue -= 2
+  def indentLevel = indentValue
+  def zeroIndent() = {
+    indentValue = 0
+  }
 }
 
-class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with Emitter {
+class UclidEmitter extends SeqTransform with Emitter {
   def inputForm = LowForm
   def outputForm = LowForm
 
@@ -56,9 +70,9 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
     }
   }
 
-  private def memAddrType(mem: DefMemory): UIntType = UIntType(IntWidth(ceilLog2(mem.depth) max 1))
+  private def memAddrType(mem: DefMemory): UIntType = UIntType(IntWidth(mem.depth.bitLength))
 
-  private def serialize_rhs_ref(wr: WRef)(implicit rhsPrimes: Boolean): String = {
+  private def serialize_rhs_ref(wr: WRef, rhsPrimes: Boolean)(implicit wState: WriterState): String = {
     if (rhsPrimes) s"${wr.name}'" else s"${wr.name}"
   }
 
@@ -66,9 +80,9 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
     case Neg => s"-$arg0"
     case Not => s"~${arg0}" 
     // TODO: Handle asUInt operator
-    case asUInt => arg0
+    case AsUInt => arg0
     // TODO: Handle asSInt operator
-    case asSInt => arg0
+    case AsSInt => arg0
     case _ => throwInternalError(s"Illegal unary operator: ${p.op}")
   }
 
@@ -228,20 +242,20 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
     case _ => throwInternalError(s"Illegal ternary operator: ${p.op}")
   }
 
-  private def serialize_prim(p: DoPrim)(implicit rhsPrimes: Boolean): String = (p.args.length, p.consts.length) match {
-    case (2, 0) => serialize_binop(p, serialize_rhs_exp(p.args(0)), serialize_rhs_exp(p.args(1)))
-    case (1, 0) => serialize_unop(p, serialize_rhs_exp(p.args(0)))
-    case (1, 2) => serialize_ternop(p, serialize_rhs_exp(p.args(0)), p.consts(0).toString, p.consts(1).toString)
-    case (1, 1) => serialize_binop(p, serialize_rhs_exp(p.args(0)), p.consts(0).toString)
+  private def serialize_prim(p: DoPrim, rhsPrimes: Boolean)(implicit wState: WriterState): String = (p.args.length, p.consts.length) match {
+    case (2, 0) => serialize_binop(p, serialize_rhs_exp(p.args(0), rhsPrimes), serialize_rhs_exp(p.args(1), rhsPrimes))
+    case (1, 0) => serialize_unop(p, serialize_rhs_exp(p.args(0), rhsPrimes))
+    case (1, 2) => serialize_ternop(p, serialize_rhs_exp(p.args(0), rhsPrimes), p.consts(0).toString, p.consts(1).toString)
+    case (1, 1) => serialize_binop(p, serialize_rhs_exp(p.args(0), rhsPrimes), p.consts(0).toString)
     case (0, 2) => serialize_binop(p, p.consts(0).toString, p.consts(1).toString)
     case (0, 1) => serialize_unop(p, p.consts(0).toString)
     case _ => throwInternalError(s"Illegal primitive operator operands")
   }
 
-  private def serialize_mux(m: Mux)(implicit rhsPrimes: Boolean): String = {
-    val i = serialize_rhs_exp(m.cond)
-    val t = serialize_rhs_exp(m.tval)
-    val e = serialize_rhs_exp(m.fval)
+  private def serialize_mux(m: Mux, rhsPrimes: Boolean)(implicit wState: WriterState): String = {
+    val i = serialize_rhs_exp(m.cond, rhsPrimes)
+    val t = serialize_rhs_exp(m.tval, rhsPrimes)
+    val e = serialize_rhs_exp(m.fval, rhsPrimes)
     val rets = equalize_binary_op((m.tval.tpe, m.fval.tpe), t, e)
     //TODO: Check this fix for muxes since we don't assume uint<1> to be booleans
 
@@ -259,11 +273,11 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
     case _ => throwInternalError(s"Cannot get width of type ${tpe}")
   }
 
-  private def serialize_rhs_exp(e: Expression)(implicit rhsPrimes: Boolean): String = e match {
-    case wr: WRef => serialize_rhs_ref(wr)
-    case ws: WSubField => serialize_rhs_ref(WRef(LowerTypes.loweredName(ws)))
-    case m: Mux => serialize_mux(m)
-    case p: DoPrim => serialize_prim(p)
+  private def serialize_rhs_exp(e: Expression, rhsPrimes: Boolean)(implicit wState: WriterState): String = e match {
+    case wr: WRef => serialize_rhs_ref(wr, rhsPrimes)
+    case ws: WSubField => serialize_rhs_ref(WRef(LowerTypes.loweredName(ws)), rhsPrimes)
+    case m: Mux => serialize_mux(m, rhsPrimes)
+    case p: DoPrim => serialize_prim(p, rhsPrimes)
     case ul: UIntLiteral => s"${ul.value}bv${get_width(ul.width)}"
     case sl: SIntLiteral => s"${sl.value}bv${get_width(sl.width)}"
     case _ => 
@@ -286,140 +300,131 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
       throwInternalError(s"Trying to emit unsupported type: ${t.serialize}")
   }
 
-  private def indent_line()(implicit w: Writer, indent: IndentLevel): Unit = {
-    w write (" " * indent.value)
+  private def indent_line()(implicit wState: WriterState): Unit = {
+    wState write (" " * wState.indentLevel)
   }
 
-  private def debug(s: String)(implicit w: Writer, indent: IndentLevel): Unit = {
-    if (debugOutput) {
-      indent_line();
-      w write s"// ${s}\n"
-    }
-  }
-
-  private def emit_port(p: Port)(implicit w: Writer, indent: IndentLevel): Unit = {
+  private def emit_port(p: Port)(implicit wState: WriterState): Unit = {
     indent_line()
     val dir = if (p.direction == Input) "input" else "output"
     val uclType = serialize_type(p.tpe)
-    w write s"${dir} ${p.name} : ${uclType};\n"
+    wState write s"${dir} ${p.name} : ${uclType};\n"
   }
 
-  private def emit_reg_decl(r: DefRegister)(implicit w: Writer, indent: IndentLevel): Unit = {
+  private def emit_reg_decl(r: DefRegister)(implicit wState: WriterState): Unit = {
     indent_line()
     val uclType = serialize_type(r.tpe)
-    w write s"var ${r.name} : ${uclType};\n"
+    wState write s"var ${r.name} : ${uclType};\n"
   }
 
-  private def emit_mem_decl(m: DefMemory)(implicit w: Writer, indent: IndentLevel): Unit = {
+  private def emit_mem_decl(m: DefMemory)(implicit wState: WriterState): Unit = {
     indent_line()
     val uclType = serialize_type(m.dataType)
     val addrType = serialize_type(memAddrType(m))
-    w write s"var ${m.name} : [$addrType]${uclType};\n"
+    wState write s"var ${m.name} : [$addrType]${uclType};\n"
   }
 
-  private def emit_node_decl(r: DefNode)(implicit w: Writer, indent: IndentLevel): Unit = {
+  private def emit_node_decl(r: DefNode)(implicit wState: WriterState): Unit = {
     indent_line()
     val uclType = serialize_type(r.value.tpe)
-    w write s"var ${r.name} : ${uclType};\n"
+    wState write s"var ${r.name} : ${uclType};\n"
   }
 
-  private def emit_wire_decl(wire: DefWire)(implicit w: Writer, indent: IndentLevel): Unit = {
+  private def emit_wire_decl(wire: DefWire)(implicit wState: WriterState): Unit = {
     indent_line()
     val uclType = serialize_type(wire.tpe)
-    w write s"var ${wire.name} : ${uclType};\n"
+    wState write s"var ${wire.name} : ${uclType};\n"
   }
 
   private def emit_init(mems: Seq[DefMemory], nodes: Seq[DefNode], comb_assigns: Seq[Connect], reset: Option[Port])
-    (implicit w: Writer, indent: IndentLevel): Unit = {
+    (implicit wState: WriterState): Unit = {
     indent_line()
-    w.write(s"init {\n")
-    indent.increase()
+    wState.write(s"init {\n")
+    wState.increaseIndent()
     for (r <- reset) {
       indent_line()
-      w.write("assume reset == 1bv1;\n")
+      wState.write("assume reset == 1bv1;\n")
     }
     for (m <- mems) {
       indent_line()
       val addrType = serialize_type(memAddrType(m))
       val dataType = serialize_type(m.dataType)
-      w.write(s"assume (forall (a : $addrType) :: ${m.name}[a] == 0$dataType);\n")
+      wState.write(s"assume (forall (a : $addrType) :: ${m.name}[a] == 0$dataType);\n")
     }
     // TODO: these may need toposort
     nodes.foreach(emit_node_init(_))
     //TODO: Comb assigns need to be adjusted for width
     comb_assigns.foreach(emit_wire_init(_))
-    indent.decrease()
+    wState.decreaseIndent()
     indent_line()
-    w.write("}\n")
+    wState.write("}\n")
   }
 
-  private def emit_node_init(n: DefNode)(implicit w: Writer, indent: IndentLevel): Unit = {
-    implicit val rhsPrimes = false
+  private def emit_node_init(n: DefNode)(implicit wState: WriterState): Unit = {
     indent_line()
-    w write s"${n.name} = "
-    w write serialize_rhs_exp(n.value)
-    w write ";\n"
+    wState write s"${n.name} = "
+    wState write serialize_rhs_exp(n.value, rhsPrimes = false)
+    wState write ";\n"
   }
 
   //NOTE: This is only used to process combinational assigns (which are certain connect statements in the init block
-  private def emit_wire_init(c: Connect)(implicit w: Writer, indent: IndentLevel): Unit = {
+  private def emit_wire_init(c: Connect)(implicit wState: WriterState): Unit = {
     require(get_width(c.loc.tpe) >= get_width(c.expr.tpe))
-    implicit val rhsPrimes = false
     val lhs = serialize_lhs_exp(c.loc)
-    val rhs = serialize_rhs_exp(c.expr)
+    val rhs = serialize_rhs_exp(c.expr, rhsPrimes = false)
     val args = equalize_binary_op((c.loc.tpe, c.expr.tpe), lhs, rhs) 
     indent_line()
-    w write s"${args._1} = ${args._2}"
-    w write ";\n"
+    wState write s"${args._1} = ${args._2}"
+    wState write ";\n"
   }
 
-  private def emit_inst_decl(i: WDefInstance, f : LinkedHashMap[String, Expression], m : Module)(implicit w: Writer, indent: IndentLevel): Unit = {
+  private def emit_inst_decl(i: WDefInstance, f : LinkedHashMap[String, Expression], m : Module)(implicit wState: WriterState): Unit = {
     val inst_params = new ArrayBuffer[String]()
     for (p <- m.ports) {
       f.get(p.name) match {
         case Some(v) => {
           //TODO: Fix this connection assumption by implementing partial connects
           require(get_width(p.tpe) >= get_width(v.tpe))
-          val args = equalize_binary_op((p.tpe, v.tpe), p.name, serialize_rhs_exp(v)(false))
+          val args = equalize_binary_op((p.tpe, v.tpe), p.name, serialize_rhs_exp(v, false))
           inst_params.append(s"${args._1} : (${args._2})")
         }
         case None => if (p.tpe != ClockType) {
-          w write s"var ${i.name}_${p.name} : ${serialize_type(p.tpe)};\n"
+          wState write s"var ${i.name}_${p.name} : ${serialize_type(p.tpe)};\n"
           inst_params.append(s"${p.name} : (${i.name}_${p.name})")
         }
       }
     }
     
     indent_line()
-    w write s"instance ${i.name} : ${i.module}(${inst_params.mkString(", ")});\n"
+    wState write s"instance ${i.name} : ${i.module}(${inst_params.mkString(", ")});\n"
   }
 
 
-  private def emit_node_assignment(n: DefNode)(implicit w: Writer, indent: IndentLevel, rhsPrimes: Boolean): Unit = {
+  private def emit_node_assignment(n: DefNode)(implicit wState: WriterState): Unit = {
     indent_line()
-    w write s"${n.name}' = "
-    w write serialize_rhs_exp(n.value)
-    w write ";\n"
+    wState write s"${n.name}' = "
+    wState write serialize_rhs_exp(n.value, rhsPrimes = true)
+    wState write ";\n"
   }
 
-  private def emit_connect(c: Connect)(implicit w: Writer, indent: IndentLevel, rhsPrimes: Boolean): Unit = {
+  private def emit_connect(c: Connect, rhsPrimes: Boolean)(implicit wState: WriterState): Unit = {
     require(get_width(c.loc.tpe) >= get_width(c.expr.tpe))
     val lhs = serialize_lhs_exp(c.loc)
-    val rhs = serialize_rhs_exp(c.expr)
+    val rhs = serialize_rhs_exp(c.expr, rhsPrimes)
     val args = equalize_binary_op((c.loc.tpe, c.expr.tpe), lhs, rhs) 
     indent_line()
-    w write s"${args._1}' = ${args._2}"
-    w write ";\n"
+    wState write s"${args._1}' = ${args._2}"
+    wState write ";\n"
   }
 
-  private def emit_mem_reads(m: DefMemory)(implicit w: Writer, indent: IndentLevel, rhsPrimes: Boolean): Unit = {
+  private def emit_mem_reads(m: DefMemory)(implicit wState: WriterState): Unit = {
     for (r <- m.readers) {
       val lhs = serialize_lhs_exp(memPortField(m, r, "data"))
-      val rref = serialize_rhs_exp(WRef(m.name))
-      val ridx = serialize_rhs_exp(memPortField(m, r, "addr"))
+      val rref = serialize_rhs_exp(WRef(m.name), true)
+      val ridx = serialize_rhs_exp(memPortField(m, r, "addr"), rhsPrimes = true)
       indent_line()
-      w write s"${lhs}' = $rref[$ridx]"
-      w write ";\n"
+      wState write s"${lhs}' = $rref[$ridx]"
+      wState write ";\n"
     }
   } 
 
@@ -427,12 +432,12 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
   private def writeProcedureName(m: DefMemory): String = s"write_mem_${m.name}"
 
   private case class WritePort(name: String, addr: String, data: String, en: String, mask: String)
-  private def emit_mem_write_procedure(m: DefMemory)(implicit w: Writer, indent: IndentLevel, rhsPrimes: Boolean): Unit = {
+  private def emit_mem_write_procedure(m: DefMemory)(implicit wState: WriterState): Unit = {
     indent_line()
     val pname = writeProcedureName(m)
-    w.write(s"procedure $pname() modifies ${m.name}, havoc_${m.name};\n")
+    wState.write(s"procedure $pname() modifies ${m.name}, havoc_${m.name};\n")
     indent_line()
-    w.write("{\n")
+    wState.write("{\n")
     val ports = m.writers.map { wr =>
       val en = serialize_lhs_exp(memPortField(m, wr, "en"))
       val mask = serialize_lhs_exp(memPortField(m, wr, "mask"))
@@ -440,86 +445,86 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
       val data = serialize_lhs_exp(memPortField(m, wr, "data"))
       WritePort(wr, addr, data, en, mask)
     }
-    indent.increase()
+    wState.increaseIndent()
     for (p <- ports) {
       indent_line()
       //TODO: Check that changing this to a bitwise and is correct
-      w.write(s"if ((${p.en} & ${p.mask}) == 1bv1) {\n")
-      indent.increase()
+      wState.write(s"if ((${p.en} & ${p.mask}) == 1bv1) {\n")
+      wState.increaseIndent()
       indent_line()
-      w.write(s"${m.name}[${p.addr}] = ${p.data};\n")
-      indent.decrease()
+      wState.write(s"${m.name}[${p.addr}] = ${p.data};\n")
+      wState.decreaseIndent()
       indent_line()
-      w.write("}\n")
+      wState.write("}\n")
     }
     // Check for address collisions
     for (Seq(p1, p2) <- ports.combinations(2)) {
       indent_line()
-      w.write(s"if (${p1.en} && ${p2.en} && ${p1.mask} && ${p2.mask} && (${p1.addr} == ${p2.addr})) {\n")
-      indent.increase()
+      wState.write(s"if (${p1.en} && ${p2.en} && ${p1.mask} && ${p2.mask} && (${p1.addr} == ${p2.addr})) {\n")
+      wState.increaseIndent()
       indent_line()
-      w.write(s"havoc havoc_${m.name};\n")
+      wState.write(s"havoc havoc_${m.name};\n")
       indent_line()
-      w.write(s"${m.name}[${p1.addr}] = havoc_${m.name};\n")
-      indent.decrease()
+      wState.write(s"${m.name}[${p1.addr}] = havoc_${m.name};\n")
+      wState.decreaseIndent()
       indent_line()
-      w.write("}\n")
+      wState.write("}\n")
     }
-    indent.decrease()
+    wState.decreaseIndent()
     indent_line()
-    w.write("}\n");
+    wState.write("}\n");
   }
 
-  private def emit_mem_writes(m: DefMemory)(implicit w: Writer, indent: IndentLevel, rhsPrimes: Boolean): Unit = {
+  private def emit_mem_writes(m: DefMemory)(implicit wState: WriterState): Unit = {
     indent_line()
     val pname = writeProcedureName(m)
-    w.write(s"call $pname();\n")
+    wState.write(s"call $pname();\n")
   }
 
-  private def emit_open_module_scope(m: Module)(implicit w: Writer, indent: IndentLevel): Unit = {
-    w write s"module ${m.name} {\n"
-    indent.increase()
+  private def emit_open_module_scope(m: Module)(implicit wState: WriterState): Unit = {
+    wState write s"module ${m.name} {\n"
+    wState.increaseIndent()
   }
 
-  private def emit_open_next_scope()(implicit w: Writer, indent: IndentLevel): Unit = {
+  private def emit_open_next_scope()(implicit wState: WriterState): Unit = {
     indent_line()
-    w write s"next {\n"
-    indent.increase()
+    wState write s"next {\n"
+    wState.increaseIndent()
   }
 
-  private def emit_close_scope()(implicit w: Writer, indent: IndentLevel): Unit = {
-    indent.decrease()
+  private def emit_close_scope()(implicit wState: WriterState): Unit = {
+    wState.decreaseIndent()
     indent_line()
-    w write s"}\n"
+    wState write s"}\n"
   }
 
-  private def emit_module_level_annos(cs: CircuitState)(implicit w: Writer, indent: IndentLevel): Unit = {
+  private def emit_module_level_annos(cs: CircuitState)(implicit wState: WriterState): Unit = {
     cs.annotations.collect {
-      case ml: ModuleLevel => w.write(s"  ${ml.serializeUCL}\n")
+      case ml: ModuleLevel => wState.write(s"  ${ml.serializeUCL}\n")
     }
   }
 
-  private def emit_control_block(cs: CircuitState)(implicit w: Writer, indent: IndentLevel): Unit = {
+  private def emit_control_block(cs: CircuitState)(implicit wState: WriterState): Unit = {
     cs.annotations.collect {
       case BMCAnnotation(steps) =>
         indent_line()
-        w.write(s"control {\n")
-        indent.increase()
+        wState.write(s"control {\n")
+        wState.increaseIndent()
         indent_line()
-        w.write(s"vobj = unroll(${steps});\n")
+        wState.write(s"vobj = unroll(${steps});\n")
         indent_line()
-        w.write(s"check;\n")
+        wState.write(s"check;\n")
         indent_line()
-        w.write(s"print_results();\n")
+        wState.write(s"print_results();\n")
         indent_line()
-        w.write(s"vobj.print_cex();\n")
-        indent.decrease()
+        wState.write(s"vobj.print_cex();\n")
+        wState.decreaseIndent()
         indent_line()
-        w.write(s"}\n")
+        wState.write(s"}\n")
     }
   }
 
-  private def emit_module(m: Module, cs: CircuitState, modMap: LinkedHashMap[String, Module])(implicit w: Writer): Unit = {
+  private def emit_module(m: Module, cs: CircuitState, modMap: LinkedHashMap[String, Module])(implicit wState: WriterState): Unit = {
     // Just IO, nodes, registers
     val nodes = ArrayBuffer[DefNode]()
     val wire_decls = ArrayBuffer[DefWire]()
@@ -645,18 +650,23 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
     // Consistency checks to see if module uses <=1 clock and <=1 reset
     if (clock_sets.size > 1 || reg_resets.size > 0)
       throw EmitterException("Uclid backend supports only a single clock domain and zero explicit resets")
-    implicit val indent = new IndentLevel()
+    wState.zeroIndent()
     emit_open_module_scope(m)
     m.ports.filter(p => p.tpe != ClockType && !reg_resets.contains(p.name)).foreach(emit_port(_))
-    debug("Registers")
+
+    wState.debugComment("Registers")
     reg_decls.foreach({ case (k, v) => emit_reg_decl(v) })
-    debug("Memories")
+
+    wState.debugComment("Memories")
     mem_decls.foreach(emit_mem_decl(_))
-    debug("Wires")
+
+    wState.debugComment("Wires")
     wire_decls.foreach(emit_wire_decl(_))
-    debug("Nodes")
+
+    wState.debugComment("Nodes")
     nodes.foreach(emit_node_decl(_))
-    debug("Instances")
+
+    wState.debugComment("Instances")
     inst_decls.foreach({ 
       case (k, v) => 
         val fields = inst_fields.getOrElse(k, new LinkedHashMap[String, Expression]())
@@ -666,27 +676,29 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
         }
         emit_inst_decl(v, fields, mod)
     })
-    debug("Init")
+
+    wState.debugComment("Init")
     emit_init(mem_decls, nodes, comb_assigns, implicit_reset)
-    implicit var rhsPrimes = false
-    debug("Mem Writes")
+
+    wState.debugComment("Mem Writes")
     mem_decls.foreach(emit_mem_write_procedure(_))
     emit_open_next_scope()
-    debug("Clock High")
+
+    wState.debugComment("Clock High")
     mem_decls.foreach(emit_mem_writes(_))
-    reg_assigns.foreach(emit_connect(_))
-    rhsPrimes = true
-    debug("Clock Low")
+    reg_assigns.foreach(ra => emit_connect(ra, false))
+
+    wState.debugComment("Clock Low")
     nodes.foreach(emit_node_assignment(_))
     mem_decls.foreach(emit_mem_reads(_))
-    comb_assigns.foreach(emit_connect(_))
+    comb_assigns.foreach(comb => emit_connect(comb, rhsPrimes = true))
     emit_close_scope()
     emit_module_level_annos(cs)
     emit_control_block(cs)
     emit_close_scope()
   }
 
-  def emit(cs: CircuitState, w: Writer): Unit = {
+  def emit(cs: CircuitState, wState: WriterState): Unit = {
     val circuit = runTransforms(cs).circuit
     val instGraph = new InstanceGraph(circuit)
     val moduleOrder = instGraph.moduleOrder.reverse
@@ -700,11 +712,13 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
     })
 
     moduleOrder.map(m => m match {
-      case m: Module => emit_module(m, cs, moduleMap)(w)
+      case m: Module => emit_module(m, cs, moduleMap)(wState)
       //TODO: Need to handle external modules
       case _ => throw EmitterException(s"UCLID backed supports ordinary modules only!")
     })
   }
+
+  def emit(cs: CircuitState, writer: Writer) = emit(cs, new WriterState(writer = writer))
 
   /** Transforms to run before emission */
   def transforms = Seq(
@@ -715,11 +729,12 @@ class UclidEmitter(val debugOutput: Boolean = false) extends SeqTransform with E
   )
 
   override def execute(cs: CircuitState): CircuitState = {
+    val debug = cs.annotations.collectFirst({ case DebugLevel(dbg) => dbg }).getOrElse(false)
     val extraAnnotations = cs.annotations.flatMap {
       case EmitCircuitAnnotation(_) =>
-        val writer = new java.io.StringWriter
-        emit(cs, writer)
-        Seq(EmittedVerilogCircuitAnnotation(EmittedVerilogCircuit(cs.circuit.main, writer.toString, outputSuffix)))
+        val wState = new WriterState(debugOutput = debug)
+        emit(cs, wState)
+        Seq(EmittedVerilogCircuitAnnotation(EmittedVerilogCircuit(cs.circuit.main, wState.serialize(), outputSuffix)))
       case _ => Seq()
     }
     cs.copy(annotations = extraAnnotations ++ cs.annotations)
