@@ -500,7 +500,7 @@ class UclidEmitter extends SeqTransform with Emitter {
 
   private def emit_module_level_annos(cs: CircuitState)(implicit wState: WriterState): Unit = {
     cs.annotations.collect {
-      case ml: ModuleLevel => wState.write(s"  ${ml.serializeUCL}\n")
+      case ml: ModuleLevelProperty => wState.write(s"  ${ml.serializeUCL}\n")
     }
   }
 

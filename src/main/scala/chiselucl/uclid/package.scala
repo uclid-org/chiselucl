@@ -12,7 +12,6 @@ package object uclid {
       if (compileOptions.checkSynthesizable) {
         requireIsHardware(data, "Signal used in Uclid property/invariant/assumption")
       }
-      dontTouch(data)
     }
   }
 
