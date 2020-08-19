@@ -31,9 +31,3 @@ object Assert {
     condition
   }
 }
-
-object LTLProperty {
-  def apply(formula: LTLFormula, name: String): Unit = {
-
-  }
-}

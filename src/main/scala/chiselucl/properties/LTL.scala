@@ -1,47 +1,20 @@
 package chiselucl
 package properties
 
-import chisel3._
+import util.annotations._
+import properties.ir._
+import properties.transforms._
 
-trait LTLFormula
-
-trait UnaryLTLOp extends LTLFormula {
-  val operand: LTLFormula
-  val symbol: String
+object LTL {
+  def apply(formula: LTLFormula, name: String): Unit = {
+    chisel3.experimental.annotate(new chisel3.experimental.ChiselAnnotation {
+      def toFirrtl = UclidLTLAnnotation(name, LTLCompiler.captureRefTargets(formula))
+    })
+  }
 }
 
-trait BinaryLTLOp extends LTLFormula {
-  val lOperand: LTLFormula
-  val rOperand: LTLFormula
-  val symbol: String
-}
-
-case class AtomicProposition(value: Bool) extends LTLFormula
-
-case class Globally(operand: LTLFormula) extends UnaryLTLOp {
-  val symbol = "G"
-}
-
-case class Next(operand: LTLFormula) extends UnaryLTLOp {
-  val symbol = "X"
-}
-
-case class Until(operand: LTLFormula) extends UnaryLTLOp {
-  val symbol = "U"
-}
-
-case class Finally(operand: LTLFormula) extends UnaryLTLOp {
-  val symbol = "F"
-}
-
-case class Release(operand: LTLFormula) extends UnaryLTLOp {
-  val symbol = "R"
-}
-
-case class WeakUntil(operand: LTLFormula) extends UnaryLTLOp {
-  val symbol = "W"
-}
-
-case class Implies(lOperand: LTLFormula, rOperand: LTLFormula) extends BinaryLTLOp {
-  val symbol = "==>"
+object AP {
+  def apply(condition: chisel3.Bool): AtomicProposition = {
+    bool2AtomicProposition(condition)
+  }
 }
