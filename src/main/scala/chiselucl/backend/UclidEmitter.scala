@@ -6,6 +6,7 @@ package backend
 
 import java.io.Writer
 
+import chiselucl.transforms._
 import chiselucl.annotations._
 
 import firrtl._
