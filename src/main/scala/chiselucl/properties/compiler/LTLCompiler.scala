@@ -1,6 +1,6 @@
 package chiselucl
 package properties
-package transforms
+package compiler
 
 import firrtl.RenameMap
 import firrtl.annotations.ReferenceTarget

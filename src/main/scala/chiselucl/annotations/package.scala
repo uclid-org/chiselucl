@@ -5,7 +5,7 @@ import firrtl.annotations._
 import firrtl.transforms.DontTouchAllTargets
 
 import properties.ir._
-import properties.transforms._
+import properties.compiler._
 
 package object annotations {
 

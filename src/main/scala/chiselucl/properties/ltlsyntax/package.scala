@@ -3,7 +3,7 @@ package properties
 
 import annotations._
 import properties.ir._
-import properties.transforms._
+import properties.compiler._
 
 package object ltlsyntax {
   object LTL {
