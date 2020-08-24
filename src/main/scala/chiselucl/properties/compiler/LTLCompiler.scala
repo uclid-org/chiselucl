@@ -21,6 +21,17 @@ object LTLCompiler {
     }
   }
 
+  def getTargets(ltl: LTLFormula): Seq[ReferenceTarget] = {
+    var postOrder: List[ReferenceTarget] = Nil
+    transformLeaves(ltl) {
+      case lrt @ LeafReferenceTarget(rt) =>
+        postOrder = rt :: postOrder
+        lrt
+      case leaf => leaf
+    }
+    postOrder
+  }
+
   def captureRefTargets(ltl: LTLFormula): LTLFormula = {
     transformLeaves(ltl) {
       case LeafChiselBool(bool) => LeafReferenceTarget(bool.toTarget)

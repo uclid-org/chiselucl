@@ -499,10 +499,11 @@ class UclidEmitter extends SeqTransform with Emitter {
     wState write s"}\n"
   }
 
-  private def emit_module_level_annos(cs: CircuitState)(implicit wState: WriterState): Unit = {
-    cs.annotations.collect {
-      case ml: ModuleLevelProperty => wState.write(s"  ${ml.serializeUCL}\n")
+  private def emit_module_level_annos(cs: CircuitState, m: Module)(implicit wState: WriterState): Unit = {
+    val thisModProps: Seq[ModuleLevelProperty] = cs.annotations.collect {
+      case mlp: ModuleLevelProperty if (mlp.enclosingModule.module == m.name) => mlp
     }
+    thisModProps.foreach { prop => wState.write(s"  ${prop.serializeUCL}\n") }
   }
 
   private def emit_control_block(cs: CircuitState)(implicit wState: WriterState): Unit = {
@@ -694,7 +695,7 @@ class UclidEmitter extends SeqTransform with Emitter {
     mem_decls.foreach(emit_mem_reads(_))
     comb_assigns.foreach(comb => emit_connect(comb, rhsPrimes = true))
     emit_close_scope()
-    emit_module_level_annos(cs)
+    emit_module_level_annos(cs, m)
     emit_control_block(cs)
     emit_close_scope()
   }

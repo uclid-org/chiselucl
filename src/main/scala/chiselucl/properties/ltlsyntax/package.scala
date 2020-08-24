@@ -9,7 +9,14 @@ package object ltlsyntax {
   object LTL {
     def apply(formula: LTLFormula, name: String): Unit = {
       chisel3.experimental.annotate(new chisel3.experimental.ChiselAnnotation {
-        def toFirrtl = UclidLTLAnnotation(name, LTLCompiler.captureRefTargets(formula))
+        def toFirrtl = {
+          val capturedFormula = LTLCompiler.captureRefTargets(formula)
+          LTLCompiler.getTargets(capturedFormula) match {
+            case rt :: tail => UclidLTLAnnotation(name, rt.moduleTarget, capturedFormula)
+            case Nil =>
+              throw new Exception("LTL properties must include at least one signal")
+          }
+        }
       })
     }
   }

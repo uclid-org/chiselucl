@@ -2,7 +2,7 @@ package chiselucl
 
 import firrtl.RenameMap
 import firrtl.annotations._
-import firrtl.transforms.DontTouchAllTargets
+import firrtl.transforms.{HasDontTouches, DontTouchAllTargets}
 
 import properties.ir._
 import properties.compiler._
@@ -13,6 +13,7 @@ package object annotations {
 
   trait ModuleLevelProperty {
     def serializeUCL: String
+    def enclosingModule: ModuleTarget
   }
 
   case class BMCAnnotation(steps: BigInt) extends NoTargetAnnotation
@@ -24,6 +25,7 @@ package object annotations {
     def targets = Seq(target)
     def duplicate(t: ReferenceTarget) = this.copy(t)
     def serializeUCL = s"assume assume_${target.ref} : ${target.ref};"
+    def enclosingModule: ModuleTarget = target.moduleTarget
   }
 
   case class UclidAssertAnnotation(target: ReferenceTarget)
@@ -33,24 +35,26 @@ package object annotations {
     def targets = Seq(target)
     def duplicate(t: ReferenceTarget) = this.copy(t)
     def serializeUCL = s"assert assert_${target.ref} : ${target.ref};"
+    def enclosingModule: ModuleTarget = target.moduleTarget
   }
 
-  case class UclidLTLAnnotation(name: String, formula: LTLFormula)
+  case class UclidLTLAnnotation(name: String, module: ModuleTarget, formula: LTLFormula)
       extends Annotation
-      with DontTouchAllTargets
+      with HasDontTouches
       with ModuleLevelProperty {
 
-    def update(renames: RenameMap) = Seq(this.copy(formula = LTLCompiler.rename(formula, renames)))
+    def dontTouches: Iterable[ReferenceTarget] = LTLCompiler.getTargets(formula)
+
+    def update(renames: RenameMap) = {
+      val newFormula = LTLCompiler.rename(formula, renames)
+      renames(module).collect {
+        case newMod: ModuleTarget => UclidLTLAnnotation(name, newMod, newFormula)
+      }
+    }
 
     override def getTargets: Seq[Target] = {
-      var postOrder: List[ReferenceTarget] = Nil
-      LTLCompiler.transformLeaves(formula) {
-        case lrt @ LeafReferenceTarget(rt) =>
-          postOrder = rt :: postOrder
-          lrt
-        case leaf => leaf
-      }
-      postOrder
+      val fTargets: Seq[Target] = LTLCompiler.getTargets(formula)
+      module +: fTargets
     }
 
     def serializeUCL = {
@@ -58,5 +62,7 @@ package object annotations {
       val formulaString = LTLCompiler.serializeUCL(finalizedNames)
       s"property[LTL] ${name}: ${formulaString};"
     }
+
+    def enclosingModule: ModuleTarget = module
   }
 }
