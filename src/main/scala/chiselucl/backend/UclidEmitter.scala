@@ -50,7 +50,8 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
       Dependency[ReplaceTruncatingArithmetic],
       Dependency[DeadCodeElimination],
       Dependency[SimplifyRegUpdate],
-      Dependency[RemoveTail]
+      Dependency[RemoveTail],
+      Dependency(InferStrictBooleans)
     )
 
   override def optionalPrerequisites = Nil
@@ -293,6 +294,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     case p: DoPrim => serialize_prim(p, rhsPrimes)
     case ul: UIntLiteral => s"${ul.value}bv${get_width(ul.width)}"
     case sl: SIntLiteral => s"${sl.value}bv${get_width(sl.width)}"
+    case ToStrictBoolean(e) => s"(${serialize_rhs_exp(e, rhsPrimes)}) == 1bv1"
     case _ => 
       println(s"Unsupported rhs expression: $e")
       throwInternalError(s"Trying to emit unsupported expression")
@@ -309,6 +311,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
   private def serialize_type(tpe: Type): String = tpe match {
     case UIntType(w: Width) => s"bv${get_width(w)}"
     case SIntType(w: Width) => s"bv${get_width(w)}"
+    case StrictBooleanType => "boolean"
     case t => 
       throwInternalError(s"Trying to emit unsupported type: ${t.serialize}")
   }
