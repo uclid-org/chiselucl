@@ -17,6 +17,8 @@ import firrtl.transforms._
 import firrtl.Mappers._
 import firrtl.PrimOps._
 import firrtl.Utils._
+import firrtl.stage.Forms
+import firrtl.options.Dependency
 import MemPortUtils.{memPortField}
 
 import scala.collection.mutable.{ArrayBuffer, LinkedHashMap, HashSet}
@@ -41,9 +43,19 @@ class WriterState(writer: Writer = new java.io.StringWriter, debugOutput: Boolea
   }
 }
 
-class UclidEmitter extends SeqTransform with Emitter {
-  def inputForm = LowForm
-  def outputForm = LowForm
+class UclidEmitter extends Transform with DependencyAPIMigration {
+
+  override def prerequisites = Forms.LowForm ++
+    Seq(
+      Dependency[ReplaceTruncatingArithmetic],
+      Dependency[DeadCodeElimination],
+      Dependency[SimplifyRegUpdate],
+      Dependency[RemoveTail]
+    )
+
+  override def optionalPrerequisites = Nil
+  override def optionalPrerequisiteOf = Nil
+  override def invalidates(a: Transform): Boolean = false
 
   val outputSuffix = ".ucl"
 
@@ -71,7 +83,7 @@ class UclidEmitter extends SeqTransform with Emitter {
     }
   }
 
-  private def memAddrType(mem: DefMemory): UIntType = UIntType(IntWidth(mem.depth.bitLength))
+  private def memAddrType(mem: DefMemory): UIntType = UIntType(IntWidth(chisel3.util.log2Ceil(mem.depth)))
 
   private def serialize_rhs_ref(wr: WRef, rhsPrimes: Boolean)(implicit wState: WriterState): String = {
     if (rhsPrimes) s"${wr.name}'" else s"${wr.name}"
@@ -701,8 +713,7 @@ class UclidEmitter extends SeqTransform with Emitter {
   }
 
   def emit(cs: CircuitState, wState: WriterState): Unit = {
-    val circuit = runTransforms(cs).circuit
-    val instGraph = new InstanceGraph(circuit)
+    val instGraph = new InstanceGraph(cs.circuit)
     val moduleOrder = instGraph.moduleOrder.reverse
     // Used for creating UCLID5 instances
     val moduleMap = new LinkedHashMap[String, Module]()
@@ -720,15 +731,7 @@ class UclidEmitter extends SeqTransform with Emitter {
     })
   }
 
-  def emit(cs: CircuitState, writer: Writer) = emit(cs, new WriterState(writer = writer))
-
-  /** Transforms to run before emission */
-  def transforms = Seq(
-    new ReplaceTruncatingArithmetic,
-    new DeadCodeElimination,
-    new SimplifyRegUpdate,
-    new RemoveTail
-  )
+  def emit(cs: CircuitState, writer: Writer): Unit = emit(cs, new WriterState(writer = writer))
 
   override def execute(cs: CircuitState): CircuitState = {
     val debug = cs.annotations.collectFirst({ case DebugLevel(dbg) => dbg }).getOrElse(false)

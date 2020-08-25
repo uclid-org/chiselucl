@@ -7,6 +7,8 @@ import firrtl.transforms.{HasDontTouches, DontTouchAllTargets}
 import properties.ir._
 import properties.compiler._
 
+// TODO: add source locators to uclid emission, including on annotation-based properties
+
 package object annotations {
 
   case class DebugLevel(debug: Boolean) extends NoTargetAnnotation
