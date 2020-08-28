@@ -401,12 +401,17 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
         case Some(v) => {
           //TODO: Fix this connection assumption by implementing partial connects
           require(get_width(p.tpe) >= get_width(v.tpe))
-          val args = equalize_binary_op((p.tpe, v.tpe), p.name, serialize_rhs_exp(v, false))
+          val args = equalize_binary_op((p.tpe, v.tpe), p.name, serialize_rhs_exp(v, true))
           inst_params.append(s"${args._1} : (${args._2})")
         }
         case None => if (p.tpe != ClockType) {
+          indent_line();
           wState write s"var ${i.name}_${p.name} : ${serialize_type(p.tpe)};\n"
-          inst_params.append(s"${p.name} : (${i.name}_${p.name})")
+          if (p.direction == firrtl.ir.Input) {
+            inst_params.append(s"${p.name} : (${i.name}_${p.name}')") // primed
+          } else {
+            inst_params.append(s"${p.name} : (${i.name}_${p.name})")
+          }
         }
       }
     }
@@ -415,6 +420,10 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     wState write s"instance ${i.name} : ${i.module}(${inst_params.mkString(", ")});\n"
   }
 
+  private def emit_inst_next(i: WDefInstance)(implicit wState: WriterState): Unit = {
+    indent_line()
+    wState write s"next(${i.name});\n"
+  }
 
   private def emit_node_assignment(n: DefNode)(implicit wState: WriterState): Unit = {
     indent_line()
@@ -709,6 +718,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     nodes.foreach(emit_node_assignment(_))
     mem_decls.foreach(emit_mem_reads(_))
     comb_assigns.foreach(comb => emit_connect(comb, rhsPrimes = true))
+    inst_decls.foreach(idecl => emit_inst_next(idecl._2))
     emit_close_scope()
     emit_module_level_annos(cs, m)
     emit_control_block(cs)
