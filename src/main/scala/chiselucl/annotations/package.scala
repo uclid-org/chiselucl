@@ -36,7 +36,7 @@ package object annotations {
       with ModuleLevelProperty {
     def targets = Seq(target)
     def duplicate(t: ReferenceTarget) = this.copy(t)
-    def serializeUCL = s"assert assert_${target.ref} : ${target.ref};"
+    def serializeUCL = s"invariant assert_${target.ref} : ${target.ref};"
     def enclosingModule: ModuleTarget = target.moduleTarget
   }
 
