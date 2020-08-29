@@ -38,6 +38,7 @@ class WriterState(writer: Writer = new java.io.StringWriter, debugOutput: Boolea
   def increaseIndent() = indentValue += 2
   def decreaseIndent() = indentValue -= 2
   def indentLevel = indentValue
+  def indentString = " " * indentValue
   def zeroIndent() = {
     indentValue = 0
   }
@@ -530,24 +531,33 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     thisModProps.foreach { prop => wState.write(s"  ${prop.serializeUCL}\n") }
   }
 
+  private case class BMC(steps: BigInt)
+
+  private def emit_bmc(bmc: BMC)(implicit wState: WriterState) {
+    val id = wState.indentString
+    wState.write(
+      s"""|${id}vobj = bmc(${bmc.steps});
+          |${id}check;
+          |${id}print_results;
+          |${id}vobj.print_cex;
+          |""".stripMargin
+    )
+  }
+
   private def emit_control_block(cs: CircuitState)(implicit wState: WriterState): Unit = {
-    cs.annotations.collect {
-      case BMCAnnotation(steps) =>
-        indent_line()
-        wState.write(s"control {\n")
-        wState.increaseIndent()
-        indent_line()
-        wState.write(s"vobj = unroll(${steps});\n")
-        indent_line()
-        wState.write(s"check;\n")
-        indent_line()
-        wState.write(s"print_results();\n")
-        indent_line()
-        wState.write(s"vobj.print_cex();\n")
-        wState.decreaseIndent()
-        indent_line()
-        wState.write(s"}\n")
+    val bmc = cs.annotations.collectFirst {
+      case BMCAnnotation(steps) => BMC(steps)
     }
+
+    indent_line()
+    wState.write(s"control {\n")
+    wState.increaseIndent()
+
+    bmc.foreach(bmc => emit_bmc(bmc))
+
+    wState.decreaseIndent()
+    indent_line()
+    wState.write(s"}\n")
   }
 
   private def emit_module(m: Module, cs: CircuitState, modMap: LinkedHashMap[String, Module])(implicit wState: WriterState): Unit = {
@@ -721,7 +731,9 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     inst_decls.foreach(idecl => emit_inst_next(idecl._2))
     emit_close_scope()
     emit_module_level_annos(cs, m)
-    emit_control_block(cs)
+    if (m.name == cs.circuit.main) {
+      emit_control_block(cs)
+    }
     emit_close_scope()
   }
 
