@@ -1,3 +1,5 @@
+// See LICENSE for license details.
+
 package chiselucl
 
 import chisel3._

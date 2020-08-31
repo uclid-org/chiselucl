@@ -1,5 +1,4 @@
-// See LICENASE for license details.
-// Using rules from FIRRTL Spec 0.2.0
+// See LICENSE for license details.
 
 package chiselucl
 package backend
