@@ -20,10 +20,9 @@ object FirrtlToUclid extends App {
     //TODO: Parse a directory of FIRRTL files
     args.map(f => {
       val firrtl = FirrtlFileUtils.read(f)
-      val annos = chiselucl.FirrtlCompiler.generateModel(firrtl, "./channel_info/")
-      annos.map {
-        case Some(v) => FirrtlFileUtils.write(s"./generated_models/${v.name}${v.outputSuffix}", v.value)
-        case _ => //Do nothing
+      val emittedCircuits = chiselucl.FirrtlCompiler.generateModel(firrtl, "./channel_info/")
+      emittedCircuits.foreach {
+        circ => FirrtlFileUtils.write(s"./generated_models/${circ.name}${circ.outputSuffix}", circ.value)
       }
     })
   }

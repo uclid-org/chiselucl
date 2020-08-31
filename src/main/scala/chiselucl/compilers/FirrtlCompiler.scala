@@ -3,7 +3,7 @@
 package chiselucl
 
 import firrtl._
-import firrtl.stage.{FirrtlStage, FirrtlCircuitAnnotation, FirrtlSourceAnnotation}
+import firrtl.stage._
 
 import backend._
 import limeutil._
@@ -11,36 +11,23 @@ import limeutil._
 
 object FirrtlCompiler {
 
-  def generateModel(firrtlString : String, channelTargetDir : String) : Seq[Option[EmittedCircuit]] = {
-  
-    //TODO: Figure out which is the correct one to do
-    //val repr = toLowFirrtl(firrtlString) 
-    //val repr = toLowFirrtl(firrtlString) 
-    val repr = toMVFirrtl(firrtlString)
+  def generateModel(firrtlString : String, channelTargetDir : String) : Seq[EmittedCircuit] = {
+
+    val circuit = toLowFirrtl(firrtlString).circuit
 
     /** Add annotations for UclidEmitter and EmitChannelInfo */
-    val annotations = AnnotationSeq.apply(Seq(
-                        new EmitCircuitAnnotation(classOf[LowFirrtlEmitter]),
-                        TargetDirAnnotation(channelTargetDir)
-                      ))
-    val annotCircuitState = CircuitState(repr.circuit,
-                                         repr.form,
-                                         annotations,
-                                         repr.renames)
-    val uclidEmitter = new UclidEmitter
-    val transforms = uclidEmitter.transforms ++ 
-                      Seq(uclidEmitter, new EmitChannelInfo)
+    val annotations = Seq(
+      FirrtlCircuitAnnotation(circuit),
+      EmitCircuitAnnotation(classOf[LowFirrtlEmitter]),
+      TargetDirAnnotation(channelTargetDir),
+      RunFirrtlTransformAnnotation(new UclidEmitter)
+    )
 
-  
-    
-    val uclidModel = transforms.foldLeft(annotCircuitState) {
-      (c : CircuitState, t : Transform) => t.runTransform(c)
-    }
+    val compiled = (new FirrtlStage).run(annotations)
 
-    uclidModel.annotations.map {
-      case EmittedVerilogCircuitAnnotation(c) => Some(c)
-      case EmittedFirrtlCircuitAnnotation(c) => Some(c)
-      case _ => None
+    compiled.collect {
+      case EmittedVerilogCircuitAnnotation(c) => c
+      case EmittedFirrtlCircuitAnnotation(c) => c
     }
   }
 

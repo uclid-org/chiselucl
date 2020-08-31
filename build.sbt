@@ -1,8 +1,8 @@
 // Basic settings
 organization := "edu.berkeley.cs"
 name := "chiselucl"
-version := "0.2-SNAPSHOT"
-scalaVersion := "2.12.7"
+version := "0.3-SNAPSHOT"
+scalaVersion := "2.12.12"
 addCompilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full)
 //crossScalaVersions := Nil
 
@@ -17,9 +17,9 @@ resolvers ++= Seq(
 
 // Managed dependency on latest FIRRTL + chisel3
 //libraryDependencies += "edu.berkeley.cs" %% "firrtl" % "1.2.0-RC1"
-libraryDependencies += "edu.berkeley.cs" %% "firrtl" % "1.2.2"
+libraryDependencies += "edu.berkeley.cs" %% "firrtl" % "1.3.2"
 //libraryDependencies += "edu.berkeley.cs" %% "chisel3" % "3.2.0-RC1"
-libraryDependencies += "edu.berkeley.cs" %% "chisel3" % "3.2.2"
+libraryDependencies += "edu.berkeley.cs" %% "chisel3" % "3.3.2"
 
-libraryDependencies += "org.json4s" %% "json4s-native" % "3.6.1"
+libraryDependencies += "org.json4s" %% "json4s-native" % "3.6.9"
 
