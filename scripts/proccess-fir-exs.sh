@@ -1,5 +1,5 @@
 #!/bin/bash
-FIRRTL_FILES=./src/main/scala/chiselucl/examples/firrtl/*
+FIRRTL_FILES=./src/test/resources/chiselucl/examples/*.fir
 for f in $FIRRTL_FILES
 do 
   echo "\nGenerating UCLID5 for $f ..."
