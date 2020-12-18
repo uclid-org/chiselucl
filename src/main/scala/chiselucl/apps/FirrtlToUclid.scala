@@ -12,6 +12,7 @@ import java.io.BufferedWriter
  *
  * @input args Single FIRRTL file.
  */
+@deprecated("LIME-specific code", "0.3")
 object FirrtlToUclid extends App {
   if (args.length == 0) {
     println("Need to supply FIRRTL files as input.")
