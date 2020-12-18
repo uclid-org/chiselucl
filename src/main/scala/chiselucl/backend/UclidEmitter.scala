@@ -361,12 +361,6 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
       indent_line()
       wState.write("assume reset == 1bv1;\n")
     }
-    for (m <- mems) {
-      indent_line()
-      val addrType = serialize_type(memAddrType(m))
-      val dataType = serialize_type(m.dataType)
-      wState.write(s"assume (forall (a : $addrType) :: ${m.name}[a] == 0$dataType);\n")
-    }
     // TODO: these may need toposort
     nodes.foreach(emit_node_init(_))
     //TODO: Comb assigns need to be adjusted for width
