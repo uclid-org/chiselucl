@@ -13,7 +13,7 @@ import firrtl.analyses._
 import firrtl.ir._
 import firrtl.passes._
 import firrtl.transforms._
-import firrtl.Mappers._
+import firrtl.traversals.Foreachers._
 import firrtl.PrimOps._
 import firrtl.Utils._
 import firrtl.stage.Forms
@@ -586,7 +586,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     val comb_assigns = ArrayBuffer[Connect]()
     val wire_assigns = ArrayBuffer[Connect]()
     val implicit_reset = m.ports.collectFirst({ case p @ Port(_, "reset", Input, BoolType) => p })
-    def processStatements(s: Statement): Statement = s map processStatements match {
+    def processStatements(stmt: Statement): Unit = stmt match {
       case sx: DefNode =>
         if (sx.value.tpe == ClockType) {
           sx.value match {
@@ -598,10 +598,8 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
         } else {
           nodes += sx
         }
-        sx
       case sx @ DefRegister(_, name, tpe, _, Utils.zero, _) if consts.contains(name) =>
         consts(name) = tpe
-        sx
       case sx: DefRegister =>
         clocks += sx.clock
         sx.reset match {
@@ -611,14 +609,12 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
           case _ => throwInternalError(s"Illegal reset signal ${sx.reset}")
         }
         reg_decls += sx.name -> sx
-        sx
       // TODO: Ensure that all connect statements are automatically sign extended.
       case sx @ Connect(_, lhs, rhs) => lhs match {
         case WRef(rName, _, RegKind, _) =>
           if (!consts.contains(rName)) {
             reg_assigns += sx
           }
-          sx
         case _ =>
           kind(lhs) match {
             case RegKind => reg_assigns += sx
@@ -645,7 +641,6 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
             case _ =>
               throwInternalError(s"Only outputs, registers, and mem fields may be the lhs of Connect")
           }
-          sx
       }
       case sx @ DefMemory(_, n, dt, _, wlat, rlat, rs , ws, rws, _) =>
         require(wlat == 1 && rlat == 0 && rws.size == 0, "Must run after VerilogMemDelays!")
@@ -670,17 +665,16 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
           wire_decls += DefWire(NoInfo, LowerTypes.loweredName(en), en.tpe)
           wire_decls += DefWire(NoInfo, LowerTypes.loweredName(mask), mask.tpe)
         }
-        sx
       //TODO: Connects are being processed, we should be able to remove the connect case below
       case sx @ WDefInstance(_,name,module,_) =>
         inst_decls += sx.name -> sx
-        sx
       case DefWire(_,_,_) =>
         // These are illegal for now
         throw EmitterException("Using illegal statement!")
-      case sx =>
-        sx
+      case sx => sx.foreach(processStatements)
     }
+
+    // Process FIRRTL implementation
     processStatements(m.body)
 
     // Join equal clock sets
