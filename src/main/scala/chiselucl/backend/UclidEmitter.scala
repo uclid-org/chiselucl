@@ -360,14 +360,15 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     wState write s"var ${wire.name} : ${uclType};\n"
   }
 
-  private def emit_init(mems: Seq[DefMemory], nodes: Seq[DefNode], comb_assigns: Seq[Connect], reset: Option[Port])
+  private def emit_init(mems: Seq[DefMemory], nodes: Seq[DefNode], comb_assigns: Seq[Connect], init_assumptions: Seq[(String, Boolean)])
     (implicit wState: WriterState): Unit = {
     indent_line()
     wState.write(s"init {\n")
     wState.increaseIndent()
-    for (r <- reset) {
+    for ((k, v) <- init_assumptions) {
       indent_line()
-      wState.write("assume reset == 1bv1;\n")
+      val asNum = if (v) 1 else 0
+      wState.write(s"assume ${k} == ${asNum}bv1;\n")
     }
     // TODO: these may need toposort
     nodes.foreach(emit_node_init(_))
@@ -570,6 +571,11 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
       case malformed: UclidFreeConstantAnnotation => ??? // TODO: resolve target paths
     }
 
+    val init_assumptions = cs.annotations.collect {
+      case UclidInitialAssumptionAnnotation(rt: ReferenceTarget, value) if rt.encapsulatingModule == m.name =>
+        (rt.ref, value)
+    }
+
     // Just IO, nodes, registers
     val nodes = ArrayBuffer[DefNode]()
     val wire_decls = ArrayBuffer[DefWire]()
@@ -585,7 +591,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     val reg_assigns = ArrayBuffer[Connect]()
     val comb_assigns = ArrayBuffer[Connect]()
     val wire_assigns = ArrayBuffer[Connect]()
-    val implicit_reset = m.ports.collectFirst({ case p @ Port(_, "reset", Input, BoolType) => p })
+
     def processStatements(stmt: Statement): Unit = stmt match {
       case sx: DefNode =>
         if (sx.value.tpe == ClockType) {
@@ -731,7 +737,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     })
 
     wState.debugComment("Init")
-    emit_init(mem_decls, nodes, comb_assigns, implicit_reset)
+    emit_init(mem_decls, nodes, comb_assigns, init_assumptions)
 
     wState.debugComment("Mem Writes")
     mem_decls.foreach(emit_mem_write_procedure(_))

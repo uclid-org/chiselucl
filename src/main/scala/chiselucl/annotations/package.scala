@@ -49,6 +49,13 @@ package object annotations {
     def duplicate(t: ReferenceTarget) = this.copy(t)
   }
 
+  case class UclidInitialAssumptionAnnotation(target: ReferenceTarget, value: Boolean)
+      extends SingleTargetAnnotation[ReferenceTarget]
+      with DontTouchAllTargets {
+    def targets = Seq(target)
+    def duplicate(t: ReferenceTarget) = this.copy(t)
+  }
+
   case class UclidLTLAnnotation(name: String, module: ModuleTarget, formula: LTLFormula)
       extends Annotation
       with HasDontTouches

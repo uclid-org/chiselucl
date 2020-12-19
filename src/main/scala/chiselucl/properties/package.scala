@@ -30,6 +30,16 @@ package object properties {
       annotate(new ChiselAnnotation { def toFirrtl = UclidAssumptionAnnotation(condition.toTarget) })
       condition
     }
+    def initialReset(reset: Reset): Unit = {
+      // TODO: should check for port-type binding
+      annotate(new ChiselAnnotation { def toFirrtl = UclidInitialAssumptionAnnotation(reset.toTarget, true) })
+    }
+    def initiallyTrue(flag: Bool): Unit = initially(flag, true)
+    def initiallyFalse(flag: Bool): Unit = initially(flag, false)
+    private def initially(flag: Bool, value: Boolean): Unit = {
+      // TODO: should check for port-type binding
+      annotate(new ChiselAnnotation { def toFirrtl = UclidInitialAssumptionAnnotation(flag.toTarget, value) })
+    }
   }
 
   object Assert {

@@ -50,6 +50,7 @@ class BaseQueue[T <: UInt](gen: T, val entries: Int) extends Module {
   io.deq.bits := ram(deq_ptr.value)
 
   val deq_has_k = io.deq.valid && io.deq.bits === FreeConstant(gen)
+  Assume.initialReset(reset)
   LTL(G(AP(deq_has_k && !io.deq.ready && !reset.toBool) ==> X(deq_has_k)), "output_irrevocable")
   LTL(G(AP(io.enq.ready && !io.enq.valid && !reset.toBool) ==> X(io.enq.ready)), "input_stays_ready")
   BMC(10)
