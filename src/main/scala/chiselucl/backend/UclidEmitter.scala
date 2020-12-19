@@ -18,6 +18,8 @@ import firrtl.PrimOps._
 import firrtl.Utils._
 import firrtl.stage.Forms
 import firrtl.options.Dependency
+import firrtl.annotations.ReferenceTarget
+
 import MemPortUtils.{memPortField}
 
 import scala.collection.mutable.{ArrayBuffer, LinkedHashMap, HashSet}
@@ -67,7 +69,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
       (arg0, arg1)
     } else if (extra_bits < 0) {
       val adj_arg = p._1 match {
-        case UIntType(_) => 
+        case UIntType(_) =>
           s"bv_zero_extend(${-1 * extra_bits}, ${arg0})"
         case SIntType(_) =>
           s"bv_sign_extend(${-1 * extra_bits}, ${arg0})"
@@ -75,7 +77,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
       (adj_arg, arg1)
     } else {
       val adj_arg = p._2 match {
-        case UIntType(_) => 
+        case UIntType(_) =>
           s"bv_zero_extend(${extra_bits}, ${arg1})"
         case SIntType(_) =>
           s"bv_sign_extend(${extra_bits}, ${arg1})"
@@ -92,7 +94,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
 
   private def serialize_unop(p: DoPrim, arg0: String): String = p.op match {
     case Neg => s"-$arg0"
-    case Not => s"~${arg0}" 
+    case Not => s"~${arg0}"
     // TODO: Handle asUInt operator
     case AsUInt => arg0
     // TODO: Handle asSInt operator
@@ -125,7 +127,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
   }
 
   private def serialize_binop(p: DoPrim, arg0: String, arg1: String): String = p.op match {
-    case Add =>  
+    case Add =>
       val args = equalize_binary_op((p.args(0).tpe, p.args(1).tpe), arg0, arg1)
       p.tpe match {
         case UIntType(_) => s"bv_zero_extend(1, ${args._1}) + bv_zero_extend(1, ${args._2})"
@@ -135,7 +137,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
       val args = equalize_binary_op((p.args(0).tpe, p.args(1).tpe), arg0, arg1)
       s"${args._1} + ${args._2}"
     }
-    case Sub =>  
+    case Sub =>
       val args = equalize_binary_op((p.args(0).tpe, p.args(1).tpe), arg0, arg1)
       //TODO: Check that this sign extension is correct, if they are different types, then shouldn't we choose to sign extend and zero extend selectively
       p.tpe match {
@@ -182,7 +184,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
       s"${args._1} ^ ${args._2}"
     }
     case Bits => s"${arg0}[${arg1}]"
-    case Shl | Dshlw => 
+    case Shl | Dshlw =>
       //TODO: Uclid shifts may not work as intended
       //TODO: Is this the same as concatenating n zeros at the end
       val shamt = serialize_shamt_exp(p, arg1)
@@ -295,7 +297,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     case ul: UIntLiteral => s"${ul.value}bv${get_width(ul.width)}"
     case sl: SIntLiteral => s"${sl.value}bv${get_width(sl.width)}"
     case ToStrictBoolean(e) => s"(${serialize_rhs_exp(e, rhsPrimes)}) == 1bv1"
-    case _ => 
+    case _ =>
       println(s"Unsupported rhs expression: $e")
       throwInternalError(s"Trying to emit unsupported expression")
   }
@@ -303,7 +305,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
   private def serialize_lhs_exp(e: Expression): String = e match {
     case wr: WRef => wr.name
     case sub: WSubField => LowerTypes.loweredName(sub)
-    case _ => 
+    case _ =>
       println(s"Unsupported lhs expression: $e")
       throwInternalError(s"Trying to emit unsupported expression")
   }
@@ -312,7 +314,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     case UIntType(w: Width) => s"bv${get_width(w)}"
     case SIntType(w: Width) => s"bv${get_width(w)}"
     case StrictBooleanType => "boolean"
-    case t => 
+    case t =>
       throwInternalError(s"Trying to emit unsupported type: ${t.serialize}")
   }
 
@@ -331,6 +333,12 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     indent_line()
     val uclType = serialize_type(r.tpe)
     wState write s"var ${r.name} : ${uclType};\n"
+  }
+
+  private def emit_const_decl(name: String, tpe: Type)(implicit wState: WriterState): Unit = {
+    indent_line()
+    val uclType = serialize_type(tpe)
+    wState write s"const ${name} : ${uclType};\n"
   }
 
   private def emit_mem_decl(m: DefMemory)(implicit wState: WriterState): Unit = {
@@ -382,7 +390,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     require(get_width(c.loc.tpe) >= get_width(c.expr.tpe))
     val lhs = serialize_lhs_exp(c.loc)
     val rhs = serialize_rhs_exp(c.expr, rhsPrimes = false)
-    val args = equalize_binary_op((c.loc.tpe, c.expr.tpe), lhs, rhs) 
+    val args = equalize_binary_op((c.loc.tpe, c.expr.tpe), lhs, rhs)
     indent_line()
     wState write s"${args._1} = ${args._2}"
     wState write ";\n"
@@ -409,7 +417,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
         }
       }
     }
-    
+
     indent_line()
     wState write s"instance ${i.name} : ${i.module}(${inst_params.mkString(", ")});\n"
   }
@@ -430,7 +438,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     require(get_width(c.loc.tpe) >= get_width(c.expr.tpe))
     val lhs = serialize_lhs_exp(c.loc)
     val rhs = serialize_rhs_exp(c.expr, rhsPrimes)
-    val args = equalize_binary_op((c.loc.tpe, c.expr.tpe), lhs, rhs) 
+    val args = equalize_binary_op((c.loc.tpe, c.expr.tpe), lhs, rhs)
     indent_line()
     wState write s"${args._1}' = ${args._2}"
     wState write ";\n"
@@ -445,9 +453,9 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
       wState write s"${lhs}' = $rref[$ridx]"
       wState write ";\n"
     }
-  } 
+  }
 
-  
+
   private def writeProcedureName(m: DefMemory): String = s"write_mem_${m.name}"
 
   private case class WritePort(name: String, addr: String, data: String, en: String, mask: String)
@@ -554,6 +562,14 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
   }
 
   private def emit_module(m: Module, cs: CircuitState, modMap: LinkedHashMap[String, Module])(implicit wState: WriterState): Unit = {
+    val consts = LinkedHashMap[String, Type]() ++ cs.annotations.collect {
+      case UclidFreeConstantAnnotation(ReferenceTarget(_, mname, Nil, ref, Nil)) =>
+        mname match {
+          case s if (s == m.name) => (ref, UnknownType)
+        }
+      case malformed: UclidFreeConstantAnnotation => ??? // TODO: resolve target paths
+    }
+
     // Just IO, nodes, registers
     val nodes = ArrayBuffer[DefNode]()
     val wire_decls = ArrayBuffer[DefWire]()
@@ -574,7 +590,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
       case sx: DefNode =>
         if (sx.value.tpe == ClockType) {
           sx.value match {
-            case wr: WRef => 
+            case wr: WRef =>
                 val clock_set = eq_clocks.getOrElseUpdate(wr.name, new HashSet[String]())
                 clock_set.add(sx.name)
             case _ => throwInternalError(s"Cannot handle complex clock node def")
@@ -582,6 +598,9 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
         } else {
           nodes += sx
         }
+        sx
+      case sx @ DefRegister(_, name, tpe, _, Utils.zero, _) if consts.contains(name) =>
+        consts(name) = tpe
         sx
       case sx: DefRegister =>
         clocks += sx.clock
@@ -594,32 +613,40 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
         reg_decls += sx.name -> sx
         sx
       // TODO: Ensure that all connect statements are automatically sign extended.
-      case sx @ Connect(_, lhs, rhs) => kind(lhs) match {
-          case RegKind => reg_assigns += sx
-          case PortKind => comb_assigns += sx
-          case MemKind => rhs.tpe match {
-            case ClockType =>
-              clocks += rhs
-            case _ =>
-              comb_assigns += sx
-            }
-          case InstanceKind => lhs match {
-            case WSubField(WRef(inst_name,_,_,_), field, tpe, flow) =>
-              //TODO: Does inst need to be declared at this point?
-              require(inst_decls.contains(inst_name)) 
-              if (tpe != ClockType) {
-                val fields = inst_fields.getOrElseUpdate(inst_name, new LinkedHashMap[String, Expression]())
-                //TODO: Are fields mappings unique
-                //fields += field -> rhs
-                comb_assigns += sx
-              }
-            case _ =>
-              throwInternalError(s"Only subfields of an instance may be on the lhs of a Connect")
+      case sx @ Connect(_, lhs, rhs) => lhs match {
+        case WRef(rName, _, RegKind, _) =>
+          if (!consts.contains(rName)) {
+            reg_assigns += sx
           }
-          case _ =>
-            throwInternalError(s"Only outputs, registers, and mem fields may be the lhs of Connect")
-        }
-        sx
+          sx
+        case _ =>
+          kind(lhs) match {
+            case RegKind => reg_assigns += sx
+            case PortKind => comb_assigns += sx
+            case MemKind => rhs.tpe match {
+              case ClockType =>
+                clocks += rhs
+              case _ =>
+                comb_assigns += sx
+            }
+            case InstanceKind => lhs match {
+              case WSubField(WRef(inst_name,_,_,_), field, tpe, flow) =>
+                //TODO: Does inst need to be declared at this point?
+                require(inst_decls.contains(inst_name))
+                if (tpe != ClockType) {
+                  val fields = inst_fields.getOrElseUpdate(inst_name, new LinkedHashMap[String, Expression]())
+                  //TODO: Are fields mappings unique
+                  //fields += field -> rhs
+                  comb_assigns += sx
+                }
+              case _ =>
+                throwInternalError(s"Only subfields of an instance may be on the lhs of a Connect")
+            }
+            case _ =>
+              throwInternalError(s"Only outputs, registers, and mem fields may be the lhs of Connect")
+          }
+          sx
+      }
       case sx @ DefMemory(_, n, dt, _, wlat, rlat, rs , ws, rws, _) =>
         require(wlat == 1 && rlat == 0 && rws.size == 0, "Must run after VerilogMemDelays!")
         require(dt.isInstanceOf[GroundType], "Must run after LowerTypes")
@@ -658,7 +685,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
 
     // Join equal clock sets
     //TODO: Fix this inefficient implementation
-    eq_clocks.foreach({ 
+    eq_clocks.foreach({
       case (k1, set1) =>
         eq_clocks.foreach({
           case (k2, set2) =>
@@ -675,13 +702,16 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
         clock_sets.append(set)
     })
 
-    
+
     // Consistency checks to see if module uses <=1 clock and <=1 reset
     if (clock_sets.size > 1 || reg_resets.size > 0)
       throw EmitterException("Uclid backend supports only a single clock domain and zero explicit resets")
     wState.zeroIndent()
     emit_open_module_scope(m)
     m.ports.filter(p => p.tpe != ClockType && !reg_resets.contains(p.name)).foreach(emit_port(_))
+
+    wState.debugComment("Free Constants")
+    consts.foreach({ case (k, v) => emit_const_decl(k, v) })
 
     wState.debugComment("Registers")
     reg_decls.foreach({ case (k, v) => emit_reg_decl(v) })
@@ -696,8 +726,8 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     nodes.foreach(emit_node_decl(_))
 
     wState.debugComment("Instances")
-    inst_decls.foreach({ 
-      case (k, v) => 
+    inst_decls.foreach({
+      case (k, v) =>
         val fields = inst_fields.getOrElse(k, new LinkedHashMap[String, Expression]())
         val mod = modMap.get(v.module) match {
           case Some(value) => value
@@ -737,7 +767,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
     val moduleMap = new LinkedHashMap[String, Module]()
     moduleOrder.foreach(m => m match {
       case m : Module => {
-        moduleMap += m.name -> m 
+        moduleMap += m.name -> m
       }
       case _ =>
     })

@@ -4,12 +4,13 @@ package chiselucl
 package examples
 
 import chisel3._
-import chisel3.util.{Irrevocable, QueueIO, Queue, Counter}
+import chisel3.util.{Irrevocable, QueueIO, Counter}
 
 import chiselucl.control._
+import chiselucl.properties._
 import chiselucl.properties.ltlsyntax._
 
-class BadQueue[T <: Data](gen: T, val entries: Int) extends Module {
+class BaseQueue[T <: UInt](gen: T, val entries: Int) extends Module {
   val io = IO(new QueueIO(gen, entries))
   require(entries > 0)
 
@@ -27,39 +28,92 @@ class BadQueue[T <: Data](gen: T, val entries: Int) extends Module {
     deq_ptr.inc()
   }
 
-  io.count := deq_ptr.value - enq_ptr.value
+  val ptr_match = enq_ptr.value === deq_ptr.value
+  val maybe_full = RegInit(false.B)
+  when (io.enq.fire =/= io.deq.fire) {
+    maybe_full := io.enq.fire
+  }
 
-  io.deq.valid := enq_ptr.value =/= deq_ptr.value
-  io.enq.ready := true.B
+  val ptr_diff = enq_ptr.value - deq_ptr.value
+  if (BigInt(entries).bitCount == 1) {
+    io.count := Mux(maybe_full && ptr_match, entries.U, 0.U) | ptr_diff
+  } else {
+    io.count := Mux(ptr_match,
+      Mux(maybe_full,
+        entries.asUInt, 0.U),
+      Mux(deq_ptr.value > enq_ptr.value,
+        entries.asUInt + ptr_diff, ptr_diff))
+  }
+
+  io.deq.valid := !ptr_match || maybe_full
+  io.enq.ready := !ptr_match || !maybe_full
   io.deq.bits := ram(deq_ptr.value)
+
+  val deq_has_k = io.deq.valid && io.deq.bits === FreeConstant(gen)
+  LTL(G(AP(deq_has_k && !io.deq.ready && !reset.toBool) ==> X(deq_has_k)), "output_irrevocable")
+  LTL(G(AP(io.enq.ready && !io.enq.valid && !reset.toBool) ==> X(io.enq.ready)), "input_stays_ready")
+  BMC(10)
 }
 
-class IrrevocableExample(correct: Boolean) extends MultiIOModule {
-  val i = IO(Flipped(Irrevocable(UInt(4.W))))
-  val o = IO(Irrevocable(UInt(4.W)))
+class CorrectQueue extends BaseQueue(UInt(4.W), 4)
 
-  val q = if (correct) Module(new Queue(UInt(4.W), 4)) else Module(new BadQueue(UInt(4.W), 4))
-
-  q.io.enq.valid := i.valid
-  q.io.enq.bits := i.bits
-  i.ready := q.io.enq.ready
-
-  o.valid := q.io.deq.valid
-  o.bits := q.io.deq.bits
-  q.io.deq.ready := o.ready
-
-  LTL(G(AP(o.valid && !o.ready && !reset.toBool) ==> X(o.valid)), "output_irrevocable")
-  BMC(5)
+class MagicOutput extends BaseQueue(UInt(4.W), 4) {
+  val magic_token_at_output = ram(deq_ptr.value) === 6.U
 }
 
-class CorrectIrrevocableExample extends IrrevocableExample(true)
-class BrokenIrrevocableExample extends IrrevocableExample(false)
-
-
-object CorrectIrrevocableExampleModel extends App {
-  UclidCompiler.generateModel(() => new CorrectIrrevocableExample)
+class DropsOutput extends MagicOutput {
+  // Drop magic token after one cycle at output
+  when (io.deq.fire || magic_token_at_output) {
+     deq_ptr.inc()
+  }
 }
 
-object BrokenIrrevocableExampleModel extends App {
-  UclidCompiler.generateModel(() => new BrokenIrrevocableExample)
+class SwapsOutput extends MagicOutput {
+  when (io.deq.valid && !io.deq.ready && magic_token_at_output) {
+    io.deq.bits := ram(deq_ptr.value) + 1.U
+  }
+}
+
+class SwapsOutputAfterOne extends MagicOutput {
+  val magic_token_presented = RegInit(false.B)
+  when (io.deq.valid && !io.deq.ready && magic_token_at_output) {
+    magic_token_presented := true.B
+  } .elsewhen(io.deq.ready) {
+    magic_token_presented := false.B
+  }
+
+  when (magic_token_presented) {
+    io.deq.bits := ram(deq_ptr.value) + 1.U
+  }
+}
+
+class TogglesReady extends BaseQueue(UInt(4.W), 4) {
+  val ready_gate = RegInit(false.B)
+  io.enq.ready := ready_gate && (!ptr_match || !maybe_full)
+  io.enq.bits match {
+    case u: UInt =>
+      when (u === 7.U) { ready_gate := !ready_gate }
+      .otherwise { ready_gate := false.B }
+    case _ => false.B
+  }
+}
+
+object CorrectQueueModel extends App {
+  UclidCompiler.generateModel(() => new CorrectQueue)
+}
+
+object DropsOutputModel extends App {
+  UclidCompiler.generateModel(() => new DropsOutput)
+}
+
+object SwapsOutputModel extends App {
+  UclidCompiler.generateModel(() => new SwapsOutput)
+}
+
+object SwapsOutputAfterOneModel extends App {
+  UclidCompiler.generateModel(() => new SwapsOutputAfterOne)
+}
+
+object TogglesReadyModel extends App {
+  UclidCompiler.generateModel(() => new TogglesReady)
 }

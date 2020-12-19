@@ -42,6 +42,13 @@ package object annotations {
     def enclosingModule: ModuleTarget = target.moduleTarget
   }
 
+  case class UclidFreeConstantAnnotation(target: ReferenceTarget)
+      extends SingleTargetAnnotation[ReferenceTarget]
+      with DontTouchAllTargets {
+    def targets = Seq(target)
+    def duplicate(t: ReferenceTarget) = this.copy(t)
+  }
+
   case class UclidLTLAnnotation(name: String, module: ModuleTarget, formula: LTLFormula)
       extends Annotation
       with HasDontTouches

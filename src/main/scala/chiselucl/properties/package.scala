@@ -45,4 +45,12 @@ package object properties {
     }
   }
 
+  object FreeConstant {
+    def apply[T <: Data](t: T): T = {
+      val constReg = Reg(t)
+      constReg := constReg
+      annotate(new ChiselAnnotation { def toFirrtl = UclidFreeConstantAnnotation(constReg.toTarget) })
+      constReg
+    }
+  }
 }
