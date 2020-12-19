@@ -49,11 +49,20 @@ class BaseQueue[T <: UInt](gen: T, val entries: Int) extends Module {
   io.enq.ready := !ptr_match || !maybe_full
   io.deq.bits := ram(deq_ptr.value)
 
-  val deq_has_k = io.deq.valid && io.deq.bits === FreeConstant(gen)
   Assume.initialReset(reset)
+
+  // Basic handshaking properties
+  val deq_has_k = io.deq.valid && io.deq.bits === FreeConstant(gen)
   LTL(G(AP(deq_has_k && !io.deq.ready && !reset.toBool) ==> X(deq_has_k)), "output_irrevocable")
   LTL(G(AP(io.enq.ready && !io.enq.valid && !reset.toBool) ==> X(io.enq.ready)), "input_stays_ready")
   LTL(G(AP(io.deq.ready) ==> F(io.enq.ready)), "no_spurious_backpressure")
+
+  // Enqueued data is eventually output
+  val kprime = FreeConstant(gen)
+  val kprime_enqueued = AP(io.enq.fire && io.enq.bits === kprime)
+  val kprime_output_unless_reset = AP(reset.toBool || (io.deq.valid && io.deq.bits === kprime))
+  LTL(G(F(io.deq.ready)) ==> G(kprime_enqueued ==> F(kprime_output_unless_reset)), "input_eventually_output")
+
   BMC(10)
 }
 
