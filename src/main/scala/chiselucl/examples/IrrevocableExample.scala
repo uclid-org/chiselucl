@@ -53,6 +53,7 @@ class BaseQueue[T <: UInt](gen: T, val entries: Int) extends Module {
   Assume.initialReset(reset)
   LTL(G(AP(deq_has_k && !io.deq.ready && !reset.toBool) ==> X(deq_has_k)), "output_irrevocable")
   LTL(G(AP(io.enq.ready && !io.enq.valid && !reset.toBool) ==> X(io.enq.ready)), "input_stays_ready")
+  LTL(G(AP(io.deq.ready) ==> F(io.enq.ready)), "no_spurious_backpressure")
   BMC(10)
 }
 
