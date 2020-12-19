@@ -47,10 +47,10 @@ object InferStrictBooleans extends Transform with DependencyAPIMigration {
     val transformedModules = cs.circuit.modules.map {
       case m: Module if apBooleansByModule.contains(m.name) =>
         val ns = Namespace(m)
-        val strictBoolNodes: Seq[DefNode] = apBooleansByModule(m.name).map {
+        val strictBoolNodes: Seq[DefNode] = apBooleansByModule(m.name).collect {
           case rt: ReferenceTarget if !rt.isLocal =>
             throw new Exception("LTL properties currently do not support cross-module references.")
-          case rt: ReferenceTarget => rt.component match {
+          case rt: ReferenceTarget if renames.get(rt).isEmpty => rt.component match {
             case Nil =>
               val nodeName = ns.newName(s"${rt.ref}_strict_boolean")
               renames.record(rt, rt.copy(ref = nodeName))
