@@ -33,9 +33,11 @@ object SimplifyRegUpdate {
 /** Makes RHS of connections to registers be a ref to a node
   * This ensures there's no logic in the RHS of connections to registers
   */
-class SimplifyRegUpdate extends Transform {
-  def inputForm = LowForm
-  def outputForm = LowForm
+class SimplifyRegUpdate extends Transform with DependencyAPIMigration {
+  override def prerequisites = firrtl.stage.Forms.LowForm
+  override def optionalPrerequisites = Nil
+  override def optionalPrerequisiteOf = Nil
+  override def invalidates(a: Transform): Boolean = false
 
   def execute(state: CircuitState): CircuitState = {
     val c = state.circuit.map(SimplifyRegUpdate.onModule)

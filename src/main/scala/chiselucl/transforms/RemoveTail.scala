@@ -6,6 +6,7 @@ package transforms
 import firrtl._
 import firrtl.ir._
 import firrtl.Mappers._
+import firrtl.options.Dependency
 
 object RemoveTail {
   def removeTailE(expr: Expression): Expression = expr.map(removeTailE) match {
@@ -21,10 +22,12 @@ object RemoveTail {
 }
 
 /** Remove tail operations from low firrtl */
-class RemoveTail extends Transform {
+class RemoveTail extends Transform with DependencyAPIMigration {
   import RemoveTail._
-  def inputForm = LowForm
-  def outputForm = LowForm
+  override def prerequisites = firrtl.stage.Forms.LowForm :+ Dependency[SimplifyRegUpdate]
+  override def optionalPrerequisites = Nil
+  override def optionalPrerequisiteOf = Nil
+  override def invalidates(a: Transform): Boolean = false
 
   def execute(state: CircuitState): CircuitState = {
     val c = state.circuit.map(removeTailM)
