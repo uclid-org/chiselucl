@@ -448,11 +448,11 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
   private def emit_mem_reads(m: DefMemory)(implicit wState: WriterState): Unit = {
     for (r <- m.readers) {
       val lhs = serialize_lhs_exp(memPortField(m, r, "data"))
-      val rref = serialize_rhs_exp(WRef(m.name), true)
-      val ridx = serialize_rhs_exp(memPortField(m, r, "addr"), rhsPrimes = true)
+      val array = serialize_rhs_exp(WRef(m.name), true)
+      val memEn = serialize_rhs_exp(memPortField(m, r, "en"), true)
+      val memIdx = serialize_rhs_exp(memPortField(m, r, "addr"), rhsPrimes = true)
       indent_line()
-      wState write s"${lhs}' = $rref[$ridx]"
-      wState write ";\n"
+      wState write s"if (${memEn} == 1bv1) { ${lhs}' = $array[$memIdx]; } else { havoc ${lhs}; }\n"
     }
   }
 
