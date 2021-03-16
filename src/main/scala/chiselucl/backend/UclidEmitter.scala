@@ -111,7 +111,7 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
       }
     case Andr | Orr | Xorr =>
       // Simulate bitwise reduction operators
-      (0 until get_width(p.args.head.tpe)).map(i => s"${arg0}[$i]").mkString(
+      (0 until get_width(p.args.head.tpe)).map(i => s"$arg0[$i:$i]").mkString(
         p.op match {
           case Andr => " & "
           case Orr => " | "
