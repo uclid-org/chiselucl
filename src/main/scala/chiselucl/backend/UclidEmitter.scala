@@ -94,11 +94,30 @@ class UclidEmitter extends Transform with DependencyAPIMigration {
 
   private def serialize_unop(p: DoPrim, arg0: String): String = p.op match {
     case Neg => s"-$arg0"
-    case Not => s"~${arg0}"
+    case Not => s"~$arg0"
     // TODO: Handle asUInt operator
     case AsUInt => arg0
     // TODO: Handle asSInt operator
     case AsSInt => arg0
+    case Cvt =>
+      // Converts unsigned to signed
+      val dstLen = get_width(p.tpe)
+      val srcLen = get_width(p.args.head.tpe)
+      val diff = dstLen - srcLen
+      if (diff == 0) {
+        arg0
+      } else {
+        s"bv_sign_extend($diff, $arg0)"
+      }
+    case Andr | Orr | Xorr =>
+      // Simulate bitwise reduction operators
+      (0 until get_width(p.args.head.tpe)).map(i => s"${arg0}[$i]").mkString(
+        p.op match {
+          case Andr => " & "
+          case Orr => " | "
+          case Xorr => " ^ "
+        }
+      )
     case _ => throwInternalError(s"Illegal unary operator: ${p.op}")
   }
 
