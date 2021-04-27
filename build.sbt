@@ -17,9 +17,9 @@ resolvers ++= Seq(
 
 // Managed dependency on latest FIRRTL + chisel3
 //libraryDependencies += "edu.berkeley.cs" %% "firrtl" % "1.2.0-RC1"
-libraryDependencies += "edu.berkeley.cs" %% "firrtl" % "1.3.2"
+libraryDependencies += "edu.berkeley.cs" %% "firrtl" % "1.4.2"
 //libraryDependencies += "edu.berkeley.cs" %% "chisel3" % "3.2.0-RC1"
-libraryDependencies += "edu.berkeley.cs" %% "chisel3" % "3.3.2"
+libraryDependencies += "edu.berkeley.cs" %% "chisel3" % "3.4.2"
 
 libraryDependencies += "org.json4s" %% "json4s-native" % "3.6.9"
 
